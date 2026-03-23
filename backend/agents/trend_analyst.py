@@ -6,13 +6,12 @@ import logging
 import os
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from apify_client import ApifyClient
+from apify_client import ApifyClientAsync
+from apify_client._errors import ApifyApiError
 from backend.services.office_state import update_agent_state, AgentStatus
 from backend.services.telegram_bot import send_group_message
 
 logger = logging.getLogger(__name__)
-
-APIFY_TOKEN = os.getenv("APIFY_API_TOKEN", "")
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
@@ -61,11 +60,14 @@ async def _fetch_from_apify(topic: str, platforms: list[str]) -> tuple[list, flo
     Actor: apify/google-trends-scraper
     Falls back to mock data if APIFY_API_TOKEN is not set.
     """
-    if not APIFY_TOKEN:
+    # Read token inside function to pick up latest env var, strip hidden whitespace
+    apify_token = (os.getenv("APIFY_API_TOKEN") or "").strip()
+
+    if not apify_token:
         logger.warning("[TrendAnalyst] No APIFY_API_TOKEN — using mock data")
         return _mock_trends(topic), 7.5
 
-    client = ApifyClient(APIFY_TOKEN)
+    client = ApifyClientAsync(apify_token)
 
     run_input = {
         "searchTerms": [topic],
@@ -74,11 +76,16 @@ async def _fetch_from_apify(topic: str, platforms: list[str]) -> tuple[list, flo
         "category": 0,
     }
 
-    # Run the Actor and wait for it to finish
-    run = client.actor("apify/google-trends-scraper").call(run_input=run_input)
+    try:
+        run = await client.actor("apify/google-trends-scraper").call(run_input=run_input)
+    except ApifyApiError as e:
+        logger.error(
+            f"[TrendAnalyst] Apify API error — status_code={e.status_code} message={e.message}"
+        )
+        raise
 
     items = []
-    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+    async for item in await client.dataset(run["defaultDatasetId"]).iterate_items():
         items.append(item)
 
     if not items:

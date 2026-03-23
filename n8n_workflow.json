@@ -18,7 +18,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/webhooks/n8n/start-job",
+        "url": "https://lazydog-office-h7kx.zeabur.app/webhooks/n8n/start-job",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -38,7 +38,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/trend-analyst",
+        "url": "https://lazydog-office-h7kx.zeabur.app/agents/trend-analyst",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -58,7 +58,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/copywriter",
+        "url": "https://lazydog-office-h7kx.zeabur.app/agents/copywriter",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -79,7 +79,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/image-gen",
+        "url": "https://lazydog-office-h7kx.zeabur.app/agents/image-gen",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -99,7 +99,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/supervisor",
+        "url": "https://lazydog-office-h7kx.zeabur.app/agents/supervisor",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -200,7 +200,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/copywriter",
+        "url": "https://lazydog-office-h7kx.zeabur.app/agents/copywriter",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -222,7 +222,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/supervisor",
+        "url": "https://lazydog-office-h7kx.zeabur.app/agents/supervisor",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -305,7 +305,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/image-gen",
+        "url": "https://lazydog-office-h7kx.zeabur.app/agents/image-gen",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -325,7 +325,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/supervisor",
+        "url": "https://lazydog-office-h7kx.zeabur.app/agents/supervisor",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
