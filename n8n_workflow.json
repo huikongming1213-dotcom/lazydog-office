@@ -1,0 +1,477 @@
+{
+  "name": "Lazydog.ai Content Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lazydog-start",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "n1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 300],
+      "webhookId": "lazydog-pipeline-start"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/webhooks/n8n/start-job",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "topic",     "value": "={{ $json.body.topic }}" },
+            { "name": "platforms", "value": "={{ $json.body.platforms ?? ['ig','linkedin','x','threads','fb'] }}" },
+            { "name": "tone",      "value": "={{ $json.body.tone ?? 'casual' }}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "n2",
+      "name": "Start Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/trend-analyst",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id",    "value": "={{ $json.job_id }}" },
+            { "name": "topic",     "value": "={{ $node['Webhook Trigger'].json.body.topic }}" },
+            { "name": "platforms", "value": "={{ $node['Webhook Trigger'].json.body.platforms ?? ['ig','linkedin','x','threads','fb'] }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "n3",
+      "name": "Trend Analyst",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [620, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/copywriter",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id",    "value": "={{ $node['Start Job'].json.job_id }}" },
+            { "name": "brief",     "value": "={{ $json.brief }}" },
+            { "name": "platforms", "value": "={{ $node['Webhook Trigger'].json.body.platforms ?? ['ig','linkedin','x','threads','fb'] }}" },
+            { "name": "tone",      "value": "={{ $node['Webhook Trigger'].json.body.tone ?? 'casual' }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "n4",
+      "name": "Copywriter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/image-gen",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id", "value": "={{ $node['Start Job'].json.job_id }}" },
+            { "name": "brief",  "value": "={{ $node['Trend Analyst'].json.brief }}" },
+            { "name": "style",  "value": "modern minimal" }
+          ]
+        },
+        "options": { "timeout": 180000 }
+      },
+      "id": "n5",
+      "name": "Image Gen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1060, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/supervisor",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id",         "value": "={{ $node['Start Job'].json.job_id }}" },
+            { "name": "captions",       "value": "={{ $node['Copywriter'].json.captions }}" },
+            { "name": "image_url",      "value": "={{ $node['Image Gen'].json.image_url }}" },
+            { "name": "brief",          "value": "={{ $node['Trend Analyst'].json.brief }}" },
+            { "name": "n8n_resume_url", "value": "={{ $execution.resumeUrl }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "n6",
+      "name": "Supervisor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "n7",
+      "name": "Wait Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1500, 300],
+      "webhookId": "lazydog-wait-approval"
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose" },
+                "conditions": [{ "id": "c1", "leftValue": "={{ $json.action }}", "rightValue": "approved", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose" },
+                "conditions": [{ "id": "c2", "leftValue": "={{ $json.action }}", "rightValue": "rejected", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rejected"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose" },
+                "conditions": [{ "id": "c3", "leftValue": "={{ $json.action }}", "rightValue": "revision_requested", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Revision"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose" },
+                "conditions": [{ "id": "c4", "leftValue": "={{ $json.action }}", "rightValue": "regenerate", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Regenerate"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n8",
+      "name": "Switch Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1720, 300]
+    },
+    {
+      "parameters": {},
+      "id": "n9",
+      "name": "End Approved",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1940, 160]
+    },
+    {
+      "parameters": {},
+      "id": "n10",
+      "name": "End Rejected",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1940, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/copywriter",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id",          "value": "={{ $node['Start Job'].json.job_id }}" },
+            { "name": "brief",           "value": "={{ $node['Trend Analyst'].json.brief }}" },
+            { "name": "platforms",       "value": "={{ $node['Webhook Trigger'].json.body.platforms ?? ['ig','linkedin','x','threads','fb'] }}" },
+            { "name": "tone",            "value": "={{ $node['Webhook Trigger'].json.body.tone ?? 'casual' }}" },
+            { "name": "revision_notes",  "value": "={{ $json.notes }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "n11",
+      "name": "Copywriter Revision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1940, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/supervisor",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id",         "value": "={{ $node['Start Job'].json.job_id }}" },
+            { "name": "captions",       "value": "={{ $json.captions }}" },
+            { "name": "image_url",      "value": "={{ $node['Image Gen'].json.image_url }}" },
+            { "name": "brief",          "value": "={{ $node['Trend Analyst'].json.brief }}" },
+            { "name": "n8n_resume_url", "value": "={{ $execution.resumeUrl }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "n12",
+      "name": "Supervisor Revision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 420]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "n13",
+      "name": "Wait Revision",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2380, 420],
+      "webhookId": "lazydog-wait-revision"
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose" },
+                "conditions": [{ "id": "cr1", "leftValue": "={{ $json.action }}", "rightValue": "approved", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose" },
+                "conditions": [{ "id": "cr2", "leftValue": "={{ $json.action }}", "rightValue": "rejected", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rejected"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n14",
+      "name": "Switch Revision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [2600, 420]
+    },
+    {
+      "parameters": {},
+      "id": "n15",
+      "name": "End Revision Approved",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2820, 360]
+    },
+    {
+      "parameters": {},
+      "id": "n16",
+      "name": "End Revision Rejected",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2820, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/image-gen",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id", "value": "={{ $node['Start Job'].json.job_id }}" },
+            { "name": "brief",  "value": "={{ $node['Trend Analyst'].json.brief }}" },
+            { "name": "style",  "value": "modern minimal" }
+          ]
+        },
+        "options": { "timeout": 180000 }
+      },
+      "id": "n17",
+      "name": "Image Gen Regenerate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1940, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://katherine-anthropocentric-vincenza.ngrok-free.dev/agents/supervisor",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id",         "value": "={{ $node['Start Job'].json.job_id }}" },
+            { "name": "captions",       "value": "={{ $node['Copywriter'].json.captions }}" },
+            { "name": "image_url",      "value": "={{ $json.image_url }}" },
+            { "name": "brief",          "value": "={{ $node['Trend Analyst'].json.brief }}" },
+            { "name": "n8n_resume_url", "value": "={{ $execution.resumeUrl }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "n18",
+      "name": "Supervisor Regenerate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 560]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "n19",
+      "name": "Wait Regenerate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2380, 560],
+      "webhookId": "lazydog-wait-regenerate"
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose" },
+                "conditions": [{ "id": "cg1", "leftValue": "={{ $json.action }}", "rightValue": "approved", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose" },
+                "conditions": [{ "id": "cg2", "leftValue": "={{ $json.action }}", "rightValue": "rejected", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rejected"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n20",
+      "name": "Switch Regenerate",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [2600, 560]
+    },
+    {
+      "parameters": {},
+      "id": "n21",
+      "name": "End Regen Approved",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2820, 500]
+    },
+    {
+      "parameters": {},
+      "id": "n22",
+      "name": "End Regen Rejected",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2820, 620]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Start Job", "type": "main", "index": 0 }]]
+    },
+    "Start Job": {
+      "main": [[{ "node": "Trend Analyst", "type": "main", "index": 0 }]]
+    },
+    "Trend Analyst": {
+      "main": [[{ "node": "Copywriter", "type": "main", "index": 0 }]]
+    },
+    "Copywriter": {
+      "main": [[{ "node": "Image Gen", "type": "main", "index": 0 }]]
+    },
+    "Image Gen": {
+      "main": [[{ "node": "Supervisor", "type": "main", "index": 0 }]]
+    },
+    "Supervisor": {
+      "main": [[{ "node": "Wait Approval", "type": "main", "index": 0 }]]
+    },
+    "Wait Approval": {
+      "main": [[{ "node": "Switch Action", "type": "main", "index": 0 }]]
+    },
+    "Switch Action": {
+      "main": [
+        [{ "node": "End Approved",           "type": "main", "index": 0 }],
+        [{ "node": "End Rejected",            "type": "main", "index": 0 }],
+        [{ "node": "Copywriter Revision",     "type": "main", "index": 0 }],
+        [{ "node": "Image Gen Regenerate",    "type": "main", "index": 0 }]
+      ]
+    },
+    "Copywriter Revision": {
+      "main": [[{ "node": "Supervisor Revision", "type": "main", "index": 0 }]]
+    },
+    "Supervisor Revision": {
+      "main": [[{ "node": "Wait Revision", "type": "main", "index": 0 }]]
+    },
+    "Wait Revision": {
+      "main": [[{ "node": "Switch Revision", "type": "main", "index": 0 }]]
+    },
+    "Switch Revision": {
+      "main": [
+        [{ "node": "End Revision Approved", "type": "main", "index": 0 }],
+        [{ "node": "End Revision Rejected", "type": "main", "index": 0 }]
+      ]
+    },
+    "Image Gen Regenerate": {
+      "main": [[{ "node": "Supervisor Regenerate", "type": "main", "index": 0 }]]
+    },
+    "Supervisor Regenerate": {
+      "main": [[{ "node": "Wait Regenerate", "type": "main", "index": 0 }]]
+    },
+    "Wait Regenerate": {
+      "main": [[{ "node": "Switch Regenerate", "type": "main", "index": 0 }]]
+    },
+    "Switch Regenerate": {
+      "main": [
+        [{ "node": "End Regen Approved", "type": "main", "index": 0 }],
+        [{ "node": "End Regen Rejected", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "lazydog-office"
+  }
+}

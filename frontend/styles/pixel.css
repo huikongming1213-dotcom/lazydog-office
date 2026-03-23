@@ -1,0 +1,263 @@
+/* ═══════════════════════════════════════════════════════
+   Lazydog.ai Virtual Office — Pixel Art CSS
+   90s RPG Office aesthetic
+   ═══════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
+
+:root {
+  --px-bg:        #1a1a2e;
+  --px-panel:     #16213e;
+  --px-border:    #0f3460;
+  --px-accent:    #e94560;
+  --px-green:     #00ff88;
+  --px-yellow:    #ffd700;
+  --px-blue:      #4fc3f7;
+  --px-purple:    #bb86fc;
+  --px-idle:      #555577;
+  --px-working:   #ffd700;
+  --px-done:      #00ff88;
+  --px-error:     #ff4444;
+  --px-text:      #e0e0ff;
+  --px-dim:       #8888aa;
+}
+
+/* ── Base ─────────────────────────────────────────────── */
+* { image-rendering: pixelated; }
+
+body {
+  background-color: var(--px-bg);
+  color: var(--px-text);
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* ── Pixel Border (4px inset style) ──────────────────── */
+.px-border {
+  border: 4px solid;
+  border-color: #8888ff #222244 #222244 #8888ff;
+  box-shadow:
+    inset -2px -2px 0 #000,
+    inset 2px 2px 0 #ccccff44;
+}
+
+.px-border-accent {
+  border: 4px solid;
+  border-color: var(--px-accent) #660022 #660022 var(--px-accent);
+}
+
+/* ── Pixel Button ─────────────────────────────────────── */
+.px-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  border: 3px solid;
+  border-color: #ccccff #222244 #222244 #ccccff;
+  background: var(--px-border);
+  color: var(--px-text);
+  transition: none;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  user-select: none;
+}
+
+.px-btn:active {
+  border-color: #222244 #ccccff #ccccff #222244;
+  transform: translate(2px, 2px);
+}
+
+.px-btn-green  { background: #003322; color: var(--px-green); border-color: var(--px-green) #001a11 #001a11 var(--px-green); }
+.px-btn-red    { background: #330011; color: var(--px-error); border-color: var(--px-error) #1a0008 #1a0008 var(--px-error); }
+.px-btn-yellow { background: #332200; color: var(--px-yellow); border-color: var(--px-yellow) #1a1100 #1a1100 var(--px-yellow); }
+
+/* ── Panel / Window ───────────────────────────────────── */
+.px-panel {
+  background: var(--px-panel);
+  padding: 12px;
+}
+
+.px-titlebar {
+  background: var(--px-border);
+  padding: 4px 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 2px solid var(--px-accent);
+}
+
+.px-titlebar::before {
+  content: '▪▪▪';
+  color: var(--px-accent);
+  font-size: 10px;
+}
+
+/* ── Agent Desk ───────────────────────────────────────── */
+.agent-desk {
+  position: relative;
+  width: 160px;
+  background: var(--px-panel);
+  cursor: pointer;
+  transition: transform 0.1s steps(1);
+}
+
+.agent-desk:hover {
+  transform: translate(-2px, -2px);
+}
+
+.agent-desk:hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.05);
+  pointer-events: none;
+}
+
+/* Desk surface pixel art */
+.desk-surface {
+  height: 48px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 7px,
+      rgba(255,255,255,0.03) 7px,
+      rgba(255,255,255,0.03) 8px
+    ),
+    #1e2a3a;
+  border-top: 3px solid #4a5a6a;
+  position: relative;
+}
+
+/* Monitor on desk */
+.desk-monitor {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 30px;
+  background: #0a0a1a;
+  border: 3px solid #4a5a6a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.desk-monitor::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 5px;
+  background: #4a5a6a;
+}
+
+/* ── Status Indicator ─────────────────────────────────── */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0; /* pixel circle = square */
+  display: inline-block;
+  margin-right: 4px;
+}
+
+.status-idle    { background: var(--px-idle); }
+.status-working { background: var(--px-working); animation: blink 0.6s step-start infinite; }
+.status-done    { background: var(--px-done); }
+.status-error   { background: var(--px-error); animation: blink 0.3s step-start infinite; }
+
+/* ── Working Animation: pixel character bounces ────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes workbounce {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+
+.animate-working .agent-emoji {
+  display: inline-block;
+  animation: workbounce 0.5s steps(2) infinite;
+}
+
+/* ── Activity Feed ─────────────────────────────────────── */
+.feed-item {
+  padding: 6px 8px;
+  border-left: 3px solid var(--px-border);
+  margin-bottom: 4px;
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  line-height: 1.4;
+  animation: fadeInLeft 0.2s steps(3) forwards;
+}
+
+.feed-item.activity  { border-color: var(--px-blue); }
+.feed-item.agent     { border-color: var(--px-purple); }
+.feed-item.approval  { border-color: var(--px-green); }
+.feed-item.error     { border-color: var(--px-error); }
+
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Scrollbar (pixel style) ───────────────────────────── */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--px-bg); }
+::-webkit-scrollbar-thumb { background: var(--px-border); border: 1px solid var(--px-accent); }
+::-webkit-scrollbar-thumb:hover { background: var(--px-accent); }
+
+/* ── CRT Scanline Overlay ───────────────────────────────── */
+.crt-overlay {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  z-index: 9999;
+}
+
+/* ── Input ──────────────────────────────────────────────── */
+.px-input {
+  background: #0a0a1a;
+  border: 2px solid var(--px-border);
+  color: var(--px-text);
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  padding: 6px 10px;
+  outline: none;
+  width: 100%;
+}
+
+.px-input:focus {
+  border-color: var(--px-accent);
+  box-shadow: 0 0 0 1px var(--px-accent);
+}
+
+/* ── Tag/Badge ──────────────────────────────────────────── */
+.px-tag {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  padding: 3px 6px;
+  background: var(--px-border);
+  color: var(--px-blue);
+  letter-spacing: 0.5px;
+  border: 1px solid var(--px-blue);
+}
