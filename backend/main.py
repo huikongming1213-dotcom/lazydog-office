@@ -52,7 +52,10 @@ async def lifespan(app: FastAPI):
 
     # Register webhook (will be ngrok URL in dev)
     tg_webhook_url = f"{BACKEND_URL}/webhooks/telegram"
-    await setup_webhook(tg_webhook_url)
+    try:
+        await setup_webhook(tg_webhook_url)
+    except Exception as e:
+        logger.warning(f"Telegram webhook setup failed (non-fatal): {e}")
 
     yield
 

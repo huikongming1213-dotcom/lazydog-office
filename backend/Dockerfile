@@ -6,9 +6,10 @@ WORKDIR /app
 RUN pip install uv --no-cache-dir
 
 # Copy dependency manifest first (layer caching)
+# Build context is repo root
 COPY pyproject.toml .
 
-# Create a minimal package structure so uv can install
+# Copy entire backend package
 COPY backend/ ./backend/
 
 # Install production dependencies only
