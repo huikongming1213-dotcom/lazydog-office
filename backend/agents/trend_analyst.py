@@ -7,7 +7,6 @@ import os
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from apify_client import ApifyClientAsync
-from apify_client._errors import ApifyApiError
 from backend.services.office_state import update_agent_state, AgentStatus
 from backend.services.telegram_bot import send_group_message
 
@@ -78,9 +77,11 @@ async def _fetch_from_apify(topic: str, platforms: list[str]) -> tuple[list, flo
 
     try:
         run = await client.actor("apify/google-trends-scraper").call(run_input=run_input)
-    except ApifyApiError as e:
+    except Exception as e:
+        status_code = getattr(e, "status_code", "N/A")
+        message = getattr(e, "message", str(e))
         logger.error(
-            f"[TrendAnalyst] Apify API error — status_code={e.status_code} message={e.message}"
+            f"[TrendAnalyst] Apify API error — status_code={status_code} message={message}"
         )
         raise
 
