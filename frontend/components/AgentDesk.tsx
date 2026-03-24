@@ -92,7 +92,7 @@ export default function AgentDesk({
       {/* Last message */}
       {lastMessage && (
         <div className="w-40 text-[11px] font-mono text-pixel-dim text-center leading-tight px-1 truncate">
-          {lastMessage}
+          {lastMessage as string}
         </div>
       )}
 
