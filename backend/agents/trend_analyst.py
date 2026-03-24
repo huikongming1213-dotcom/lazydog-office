@@ -72,7 +72,7 @@ async def _fetch_from_apify(topic: str, platforms: list[str]) -> tuple[list, flo
         "searchTerms": [topic],
         "geo": "HK",
         "timeRange": "now 7-d",
-        "category": 0,
+        "category": "0",
     }
 
     try:
