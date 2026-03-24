@@ -8,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from apify_client import ApifyClientAsync
 from backend.services.office_state import update_agent_state, AgentStatus
-from backend.services.telegram_bot import send_group_message
+from backend.services.agent_messenger import send_as
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +36,19 @@ async def run_trend_analyst(job_id: str, topic: str, platforms: list[str]) -> di
         await update_agent_state("trend_analyst", AgentStatus.DONE, job_id=job_id,
                                  message="Trend analysis complete", output=result)
 
-        tg_msg = (
-            f"📊 *趨勢分析完成*\n"
-            f"🆔 Job: `{job_id}`\n"
-            f"🔍 Topic: {topic}\n"
-            f"🔥 Viral Score: {viral_score:.1f}/10\n"
-            f"📝 {brief[:200]}..."
+        top_angles = "\n".join(
+            f"  • {t['keyword']} ({t['value']}分)"
+            for t in trends[:3]
         )
-        await send_group_message(tg_msg)
+        tg_msg = (
+            f"📊 *Aria：趨勢分析完成*\n"
+            f"🆔 `{job_id[:8]}`\n"
+            f"🔥 Viral Score：{viral_score:.1f}/10\n\n"
+            f"*Top Angles：*\n{top_angles}\n\n"
+            f"💡 _{brief[:180]}_\n\n"
+            f"@Max 你去寫文案！"
+        )
+        await send_as("trend_analyst", tg_msg)
         return result
 
     except Exception as e:

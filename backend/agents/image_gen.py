@@ -8,7 +8,7 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from backend.services.office_state import update_agent_state, AgentStatus
-from backend.services.telegram_bot import send_group_message
+from backend.services.agent_messenger import send_as
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +40,13 @@ async def run_image_gen(job_id: str, brief: str, style: str = "modern minimal") 
                                  message="Image generated", output=result)
 
         tg_msg = (
-            f"🎨 *圖片生成完成*\n"
-            f"🆔 Job: `{job_id}`\n"
-            f"🖼 Model: {IMAGE_MODEL}\n"
-            f"💡 Prompt: {prompt[:120]}..."
+            f"🎨 *Zoe：圖片搞掂*\n"
+            f"🆔 `{job_id[:8]}`\n"
+            f"🖼 Model：{IMAGE_MODEL.split('/')[-1]}\n\n"
+            f"*視覺決策：*\n_{prompt[:150]}..._\n\n"
+            f"@Chief 請 review！"
         )
-        await send_group_message(tg_msg)
+        await send_as("image_gen", tg_msg)
         return result
 
     except Exception as e:

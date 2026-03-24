@@ -8,7 +8,7 @@ import anthropic
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from backend.services.office_state import update_agent_state, AgentStatus
-from backend.services.telegram_bot import send_group_message
+from backend.services.agent_messenger import send_as
 
 logger = logging.getLogger(__name__)
 
@@ -100,14 +100,16 @@ Only return the JSON, no other text.
                                  message="Captions ready, awaiting supervisor review",
                                  output=result)
 
+        ig_hook = result["captions"].get("ig", "")[:130]
+        revision_note = f"\n⚠️ _修改版本：{revision_notes[:80]}_" if revision_notes else ""
         tg_msg = (
-            f"✍️ *文案完成，等主管審核*\n"
-            f"🆔 Job: `{job_id}`\n"
-            f"📱 Platforms: {', '.join(platforms)}\n"
-            f"🎯 Tone: {tone}\n"
-            f"📝 IG Preview: {result['captions'].get('ig', '')[:100]}..."
+            f"✍️ *Max：文案出爐*\n"
+            f"🆔 `{job_id[:8]}`\n"
+            f"📱 {len(platforms)} 個平台 | Tone：{tone}{revision_note}\n\n"
+            f"*IG Hook：*\n_{ig_hook}..._\n\n"
+            f"@Zoe 配圖交你，配合呢個 vibe！"
         )
-        await send_group_message(tg_msg)
+        await send_as("copywriter", tg_msg)
         return result
 
     except Exception as e:

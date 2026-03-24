@@ -11,6 +11,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from backend.services.office_state import update_agent_state, AgentStatus
 from backend.services.telegram_bot import send_approval_request
+from backend.services.agent_messenger import send_as
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +100,20 @@ Only return the JSON, no other text.
                                  message=f"Review done. Brand score: {review.get('brand_score', 'N/A')}",
                                  output=review)
 
-        # Send TG approval request with inline keyboard
+        # Chief posts review summary to group as his own bot
+        verdict = "✅ 推薦批准" if review["approved"] else "⚠️ 有待改善"
+        issues = review.get("issues", [])
+        issues_str = ("\n" + "\n".join(f"  • {i}" for i in issues[:3])) if issues else ""
+        tg_group_msg = (
+            f"👔 *Chief：Review 完成*\n"
+            f"🆔 `{job_id[:8]}`\n"
+            f"🏆 品牌分：{review.get('brand_score', 'N/A')}/10 | {verdict}\n\n"
+            f"*Feedback：*\n_{review.get('feedback', '')[:200]}_{issues_str}\n\n"
+            f"等緊 Steve approve 👆"
+        )
+        await send_as("supervisor", tg_group_msg)
+
+        # Send TG approval request with inline keyboard to approval chat
         ig_caption = review["edited_captions"].get("ig", captions.get("ig", ""))
         await send_approval_request(
             job_id=job_id,

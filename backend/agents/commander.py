@@ -104,3 +104,32 @@ async def extract_topic(chat_id: str) -> str | None:
 def clear_history(chat_id: str):
     """Clear conversation history after pipeline starts."""
     _history.pop(chat_id, None)
+
+
+async def detect_topic_proposal(message: str) -> str | None:
+    """
+    Quick Haiku classification: is this message proposing a content topic?
+    Returns the topic string if yes, None otherwise.
+    Cost: ~$0.001 per call (Haiku).
+    """
+    client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+    try:
+        msg = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=20,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Is this message proposing a social media content topic to create posts about?\n"
+                    f"Message: \"{message}\"\n\n"
+                    "Reply: YES:<topic in 5 words or less>  OR  NO"
+                ),
+            }],
+        )
+        result = msg.content[0].text.strip()
+        if result.upper().startswith("YES:"):
+            return result[4:].strip()
+        return None
+    except Exception as e:
+        logger.error(f"[Commander] detect_topic_proposal error: {e}")
+        return None

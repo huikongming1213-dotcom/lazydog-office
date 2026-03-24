@@ -10,7 +10,9 @@ import os
 import httpx
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters, ContextTypes
-from backend.agents.commander import commander_chat, extract_topic, clear_history
+import asyncio
+from backend.agents.commander import commander_chat, extract_topic, clear_history, detect_topic_proposal
+from backend.agents.strategist import run_strategy_discussion
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +216,18 @@ async def _handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYP
         user = update.message.from_user
         username = user.first_name or user.username or "User"
         await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+
+        # Detect if user is proposing a content topic → trigger strategy discussion
+        topic = await detect_topic_proposal(update.message.text)
+        if topic:
+            await update.message.reply_text(
+                f"💡 *好想法！* 俾 Aria 先掃下 *{topic}* 嘅 market data...",
+                parse_mode="Markdown",
+            )
+            asyncio.create_task(run_strategy_discussion(topic))
+            return
+
+        # Normal group conversation
         response = await commander_chat(chat_id, update.message.text, username)
         await update.message.reply_text(response, parse_mode="Markdown")
 
