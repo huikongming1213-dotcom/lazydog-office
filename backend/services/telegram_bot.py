@@ -25,6 +25,9 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 _application: Application | None = None
 _bot: Bot | None = None
 
+# Hold references to background tasks so they aren't garbage collected
+_background_tasks: set = set()
+
 
 def build_application() -> Application:
     """Build the telegram Application (no polling — webhook mode)."""
@@ -224,7 +227,9 @@ async def _handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"💡 *好想法！* 俾 Aria 先掃下 *{topic}* 嘅 market data...",
                 parse_mode="Markdown",
             )
-            asyncio.create_task(run_strategy_discussion(topic))
+            task = asyncio.create_task(run_strategy_discussion(topic))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
             return
 
         # Normal group conversation
