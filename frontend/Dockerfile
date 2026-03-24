@@ -1,12 +1,10 @@
 FROM node:18-alpine AS deps
 WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY frontend/ .
 ARG NEXT_PUBLIC_BACKEND_URL
 ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
 RUN npm run build
