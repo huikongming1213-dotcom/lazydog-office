@@ -37,7 +37,7 @@ export default function AgentDesk({
     <div className="flex flex-col items-center gap-1">
       {/* Desk card */}
       <div
-        className={`agent-desk px-border w-40 ${status === "working" ? "animate-working" : ""}`}
+        className={`agent-desk px-border w-40 ${status === "working" ? "animate-working desk-glow" : ""} ${status === "done" ? "desk-done" : ""} ${status === "error" ? "desk-error" : ""}`}
         onClick={() => lastOutput && setShowOutput(true)}
         title={lastOutput ? "Click to view output" : undefined}
       >
@@ -48,15 +48,20 @@ export default function AgentDesk({
         </div>
 
         {/* Character area */}
-        <div className="flex flex-col items-center py-3 gap-2 bg-pixel-panel relative">
+        <div className="flex flex-col items-center py-3 gap-2 bg-pixel-panel relative overflow-hidden">
           {/* Status dot */}
           <div className={`status-dot status-${status} absolute top-2 right-2`} />
 
+          {/* Screen glow overlay when working */}
+          {status === "working" && (
+            <div className="absolute inset-0 screen-glow pointer-events-none" />
+          )}
+
           {/* Agent sprite */}
-          <div className="text-3xl agent-emoji select-none">{emoji}</div>
+          <div className="text-3xl agent-emoji select-none relative z-10">{emoji}</div>
 
           {/* Role label */}
-          <div className="font-pixel text-[5px] text-pixel-dim text-center leading-loose">
+          <div className="font-pixel text-[5px] text-pixel-dim text-center leading-loose relative z-10">
             {role}
           </div>
         </div>
@@ -68,6 +73,13 @@ export default function AgentDesk({
             <span className="text-pixel-working text-xs animate-pixel-blink">●●●</span>
           )}
         </div>
+
+        {/* Working progress bar */}
+        {status === "working" && (
+          <div className="progress-track">
+            <div className="progress-bar" />
+          </div>
+        )}
 
         {/* Job ID */}
         {jobId && (

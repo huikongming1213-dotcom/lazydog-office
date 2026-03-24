@@ -18,26 +18,26 @@ interface OfficeState {
 
 const AGENT_META = {
   trend_analyst: {
-    name: "Analyst",
-    role: "Trend Scout",
+    name: "Aria",
+    role: "趨勢分析師",
     emoji: "🐨",
     deskEmoji: "📊",
   },
   copywriter: {
-    name: "Writer",
-    role: "Copywriter",
+    name: "Max",
+    role: "文案師",
     emoji: "🐨",
     deskEmoji: "✍️",
   },
   image_gen: {
-    name: "Artist",
-    role: "Image Gen",
+    name: "Zoe",
+    role: "視覺總監",
     emoji: "🐨",
     deskEmoji: "🎨",
   },
   supervisor: {
-    name: "Boss",
-    role: "Supervisor",
+    name: "Chief",
+    role: "主管",
     emoji: "🐻",
     deskEmoji: "👔",
   },

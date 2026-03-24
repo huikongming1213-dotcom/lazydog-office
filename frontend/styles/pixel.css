@@ -192,6 +192,66 @@ body {
   animation: workbounce 0.5s steps(2) infinite;
 }
 
+/* ── Desk glow when working ───────────────────────────── */
+@keyframes desk-glow-pulse {
+  0%   { box-shadow: inset -2px -2px 0 #000, inset 2px 2px 0 #ccccff44,
+                     0 0 6px var(--px-working), 0 0 18px rgba(255,215,0,0.3); }
+  50%  { box-shadow: inset -2px -2px 0 #000, inset 2px 2px 0 #ccccff44,
+                     0 0 14px var(--px-working), 0 0 32px rgba(255,215,0,0.5); }
+  100% { box-shadow: inset -2px -2px 0 #000, inset 2px 2px 0 #ccccff44,
+                     0 0 6px var(--px-working), 0 0 18px rgba(255,215,0,0.3); }
+}
+
+.desk-glow {
+  border-color: var(--px-working) #664400 #664400 var(--px-working) !important;
+  animation: desk-glow-pulse 1.2s ease-in-out infinite;
+}
+
+.desk-done {
+  border-color: var(--px-green) #003322 #003322 var(--px-green) !important;
+  box-shadow: inset -2px -2px 0 #000, inset 2px 2px 0 #ccccff44,
+              0 0 8px var(--px-green);
+}
+
+.desk-error {
+  border-color: var(--px-error) #330000 #330000 var(--px-error) !important;
+  box-shadow: inset -2px -2px 0 #000, inset 2px 2px 0 #ccccff44,
+              0 0 8px var(--px-error);
+}
+
+/* ── Screen glow overlay ─────────────────────────────── */
+@keyframes screen-flicker {
+  0%, 95%, 100% { opacity: 0.04; }
+  96%            { opacity: 0.12; }
+  98%            { opacity: 0.06; }
+}
+
+.screen-glow {
+  background: radial-gradient(ellipse at 50% 40%, rgba(255,215,0,0.15) 0%, transparent 70%);
+  animation: screen-flicker 3s step-start infinite;
+}
+
+/* ── Progress bar ────────────────────────────────────── */
+@keyframes progress-scan {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+.progress-track {
+  height: 4px;
+  background: #0a0a1a;
+  overflow: hidden;
+  border-top: 1px solid #333;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 25%;
+  background: var(--px-working);
+  animation: progress-scan 1.5s steps(8) infinite;
+  box-shadow: 0 0 6px var(--px-working);
+}
+
 /* ── Activity Feed ─────────────────────────────────────── */
 .feed-item {
   padding: 6px 8px;
