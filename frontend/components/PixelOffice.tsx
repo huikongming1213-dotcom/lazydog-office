@@ -8,7 +8,7 @@ interface AgentState {
   status: AgentStatus;
   job_id?: string;
   last_message?: string;
-  last_output?: unknown;
+  last_output?: Record<string, unknown>;
   updated_at?: string;
 }
 

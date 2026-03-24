@@ -11,7 +11,7 @@ interface AgentDeskProps {
   status: AgentStatus;
   jobId?: string;
   lastMessage?: string;
-  lastOutput?: unknown;
+  lastOutput?: Record<string, unknown>;
 }
 
 const STATUS_LABEL: Record<AgentStatus, string> = {
@@ -92,7 +92,7 @@ export default function AgentDesk({
       {/* Last message */}
       {lastMessage && (
         <div className="w-40 text-[11px] font-mono text-pixel-dim text-center leading-tight px-1 truncate">
-          {lastMessage as string}
+          {lastMessage}
         </div>
       )}
 
@@ -108,7 +108,7 @@ export default function AgentDesk({
   );
 }
 
-function OutputModal({ title, data, onClose }: { title: string; data: unknown; onClose: () => void }) {
+function OutputModal({ title, data, onClose }: { title: string; data: Record<string, unknown>; onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
