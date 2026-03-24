@@ -9,7 +9,8 @@ import logging
 import os
 import httpx
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters, ContextTypes
+from backend.agents.commander import commander_chat, extract_topic, clear_history
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,11 @@ def build_application() -> Application:
 
     # Register handlers
     _application.add_handler(CallbackQueryHandler(_handle_approval_callback))
+    _application.add_handler(CommandHandler("go", _handle_go_command))
+    _application.add_handler(CommandHandler("status", _handle_status_command))
+    _application.add_handler(CommandHandler("clear", _handle_clear_command))
     _application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, _handle_revision_text)
+        MessageHandler(filters.TEXT & ~filters.COMMAND, _handle_text_message)
     )
     return _application
 
@@ -183,20 +187,120 @@ async def _handle_approval_callback(update: Update, context: ContextTypes.DEFAUL
     )
 
 
-async def _handle_revision_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle revision notes sent as a text message after pressing ✏️ Revise."""
+async def _handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Dispatch incoming text messages:
+    - If awaiting revision notes → handle revision
+    - If from group chat → route to agent commander for brainstorming
+    """
+    if not update.message or not update.message.text:
+        return
+
+    # Priority 1: revision notes (approval chat flow)
     job_id = context.user_data.get("awaiting_revision_for")
-    if not job_id:
-        return  # Not waiting for revision input
+    if job_id:
+        notes = update.message.text
+        context.user_data.pop("awaiting_revision_for", None)
+        await _notify_backend(job_id, "revision_requested", notes=notes)
+        await update.message.reply_text(
+            f"📝 修改意見已收到\n🆔 Job: `{job_id}`\n🔄 Rerouting to copywriter...",
+            parse_mode="Markdown",
+        )
+        return
 
-    notes = update.message.text
-    context.user_data.pop("awaiting_revision_for", None)
+    # Priority 2: group chat → agent team conversation
+    chat_id = str(update.message.chat_id)
+    if chat_id == GROUP_CHAT_ID:
+        user = update.message.from_user
+        username = user.first_name or user.username or "User"
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+        response = await commander_chat(chat_id, update.message.text, username)
+        await update.message.reply_text(response, parse_mode="Markdown")
 
-    await _notify_backend(job_id, "revision_requested", notes=notes)
+
+async def _handle_go_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /go [topic] — Start the full content pipeline.
+    If no topic given, extracts it from conversation history.
+    """
+    chat_id = str(update.message.chat_id)
+
+    # Get topic from command args or extract from history
+    if context.args:
+        topic = " ".join(context.args)
+    else:
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+        topic = await extract_topic(chat_id)
+
+    if not topic:
+        await update.message.reply_text(
+            "❓ 唔知 topic 係咩。請用 `/go <你的 topic>` 或者先係 group 傾下先。",
+            parse_mode="Markdown",
+        )
+        return
+
     await update.message.reply_text(
-        f"📝 修改意見已收到\n🆔 Job: `{job_id}`\n🔄 Rerouting to copywriter...",
+        f"🚀 *開始整！*\n📌 Topic: {topic}\n\n📊 Aria 出動緊...",
         parse_mode="Markdown",
     )
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{BACKEND_URL}/pipeline/run",
+                json={
+                    "topic": topic,
+                    "platforms": ["ig", "linkedin", "x", "threads", "fb"],
+                    "tone": "casual",
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            job_id = data.get("job_id", "unknown")
+
+        clear_history(chat_id)
+        await update.message.reply_text(
+            f"✅ Pipeline 啟動！\n🆔 `{job_id}`\n\n各 agent 開始工作，完成後主管會係 approval chat 發審核通知。",
+            parse_mode="Markdown",
+        )
+
+    except Exception as e:
+        logger.error(f"[TGBot] /go pipeline start failed: {e}")
+        await update.message.reply_text("❌ 啟動失敗，請稍後再試或檢查 backend logs。")
+
+
+async def _handle_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/status — Show recent jobs status."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{BACKEND_URL}/jobs?limit=5")
+            jobs = resp.json()
+
+        if not jobs:
+            await update.message.reply_text("📭 暫時冇進行中嘅 jobs。")
+            return
+
+        lines = ["📋 *最近 Jobs:*\n"]
+        for j in jobs:
+            status_emoji = {
+                "pending": "⏳", "trend_done": "📊", "copy_done": "✍️",
+                "image_done": "🎨", "pending_approval": "👔",
+                "approved": "✅", "rejected": "❌", "failed": "💥",
+            }.get(j["status"], "❓")
+            lines.append(f"{status_emoji} `{j['id'][:8]}` — {j['topic'][:30]} ({j['status']})")
+
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+    except Exception as e:
+        logger.error(f"[TGBot] /status failed: {e}")
+        await update.message.reply_text("❌ 查詢失敗。")
+
+
+async def _handle_clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/clear — Clear conversation history for this chat."""
+    chat_id = str(update.message.chat_id)
+    clear_history(chat_id)
+    await update.message.reply_text("🗑️ 對話記錄已清除，可以開始新話題。")
 
 
 async def _notify_backend(job_id: str, action: str, notes: str | None):

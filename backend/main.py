@@ -425,6 +425,58 @@ async def get_job_logs(job_id: str):
     return logs
 
 
+@app.post("/pipeline/run")
+async def pipeline_run(req: StartJobRequest, background_tasks: BackgroundTasks):
+    """
+    Start the full agent pipeline without N8N.
+    Called by the TG bot /go command.
+    Returns job_id immediately; pipeline runs in background.
+    """
+    job_id = str(uuid.uuid4())
+    async with get_db() as db:
+        db.add(Job(
+            id=job_id,
+            topic=req.topic,
+            platform_list=req.platforms,
+            tone=req.tone,
+            status="pending",
+        ))
+    await broadcast_activity(f"🚀 Pipeline started: {req.topic}", job_id=job_id)
+    logger.info(f"[Pipeline] New run: job={job_id} topic={req.topic}")
+    background_tasks.add_task(_run_full_pipeline, job_id, req.topic, req.platforms, req.tone)
+    return {"job_id": job_id, "status": "running"}
+
+
+async def _run_full_pipeline(job_id: str, topic: str, platforms: list, tone: str):
+    """Run all agents sequentially: Trend → Copy → Image → Supervisor."""
+    try:
+        # 1. Trend analysis
+        trend = await run_trend_analyst(job_id, topic, platforms)
+        await _update_job_status(job_id, trend_result=trend, status="trend_done")
+        await _log(job_id, "trend_analyst", "complete", trend["brief"])
+
+        # 2. Copywriting
+        copy = await run_copywriter(job_id, trend["brief"], platforms, tone)
+        await _update_job_status(job_id, copy_result=copy, status="copy_done")
+        await _log(job_id, "copywriter", "complete", "Captions generated")
+
+        # 3. Image generation
+        image = await run_image_gen(job_id, trend["brief"])
+        await _update_job_status(job_id, image_result=image, status="image_done")
+        await _log(job_id, "image_gen", "complete", image.get("image_url", ""))
+
+        # 4. Supervisor review → sends TG approval message
+        await run_supervisor(job_id, copy["captions"], image.get("image_url", ""), trend["brief"])
+        await _update_job_status(
+            job_id, status="pending_approval", approval_status="pending_approval"
+        )
+
+    except Exception as e:
+        logger.error(f"[Pipeline] job={job_id} failed: {e}")
+        await _update_job_status(job_id, status="failed")
+        await _log(job_id, "pipeline", "error", str(e), level="error")
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "lazydog-office"}
