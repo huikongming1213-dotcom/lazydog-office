@@ -227,9 +227,7 @@ async def _handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"💡 *好想法！* 俾 Aria 先掃下 *{topic}* 嘅 market data...",
                 parse_mode="Markdown",
             )
-            task = asyncio.create_task(run_strategy_discussion(topic))
-            _background_tasks.add(task)
-            task.add_done_callback(_background_tasks.discard)
+            await run_strategy_discussion(topic)
             return
 
         # Normal group conversation
