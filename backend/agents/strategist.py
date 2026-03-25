@@ -10,14 +10,13 @@ Flow:
 Each step posts to TG group as the agent's own bot.
 Full Apify call happens later in trend_analyst.py when /go is triggered.
 """
-import asyncio
 import json
 import logging
 import os
 import anthropic
-from functools import partial
 
 from backend.services.agent_messenger import send_as
+from backend.agents.trend_analyst import _fetch_from_apify, _mock_trends
 
 logger = logging.getLogger(__name__)
 
@@ -51,98 +50,36 @@ async def run_strategy_discussion(topic: str):
 
 async def _aria_quick_scan(client: anthropic.AsyncAnthropic, topic: str) -> dict:
     """
-    Real Google Trends data via pytrends (free, no API key).
-    Falls back to Haiku estimation only if Google rate-limits.
+    Real Apify Google Trends data — same source as the production pipeline.
+    Falls back to mock data if APIFY_API_TOKEN not set.
     """
-    try:
-        trends_data = await asyncio.get_event_loop().run_in_executor(
-            None, partial(_fetch_google_trends, topic)
-        )
-        return trends_data
-    except Exception as e:
-        logger.warning(f"[Strategist] pytrends failed ({e}), falling back to Haiku estimate")
-        return await _haiku_trend_fallback(client, topic)
+    trends, viral_score = await _fetch_from_apify(topic, [])
 
-
-def _fetch_google_trends(topic: str) -> dict:
-    """Synchronous Google Trends fetch — run in thread executor."""
-    from pytrends.request import TrendReq
-
-    pytrends = TrendReq(hl="zh-TW", tz=480, timeout=(10, 25))
-
-    # Overall interest for the main topic (HK, past 7 days)
-    pytrends.build_payload([topic], cat=0, timeframe="now 7-d", geo="HK")
-    interest_df = pytrends.interest_over_time()
-
-    if interest_df.empty:
-        raise ValueError("No Google Trends data returned")
-
-    scores = interest_df[topic].tolist()
-    avg_score = round(sum(scores) / len(scores) / 10, 1)  # normalise to 0-10
-    latest = scores[-1]
-    week_ago = scores[0]
-    overall_trend = "up" if latest > week_ago + 5 else "down" if latest < week_ago - 5 else "stable"
-
-    # Related queries for sub-topics
-    related = pytrends.related_queries()
-    top_related = related.get(topic, {}).get("top")
-
-    sub_topics = []
-    if top_related is not None and not top_related.empty:
-        for _, row in top_related.head(3).iterrows():
-            kw = row["query"]
-            val = int(row["value"])
-            # Quick per-keyword trend: compare first half vs second half of week
-            mid = len(scores) // 2
-            kw_trend = "up" if scores[-1] > scores[mid] else "stable"
-            sub_topics.append({"name": kw, "score": val, "trend": kw_trend})
-
-    # Fill up to 3 if fewer related queries
-    while len(sub_topics) < 3:
-        sub_topics.append({"name": topic, "score": max(1, latest - 10 * len(sub_topics)), "trend": overall_trend})
-
+    avg_score = round(viral_score, 1)
     competition = "high" if avg_score >= 7 else "medium" if avg_score >= 4 else "low"
 
-    # Rising queries as content gap signal
-    rising = related.get(topic, {}).get("rising")
-    if rising is not None and not rising.empty:
-        gap_kw = rising.iloc[0]["query"]
-        content_gap = f"rising: {gap_kw}"
-    else:
-        content_gap = "no dominant local content"
+    sub_topics = [
+        {
+            "name": t["keyword"],
+            "score": t["value"],
+            "trend": "up" if t["value"] >= 70 else "stable" if t["value"] >= 40 else "down",
+        }
+        for t in trends[:3]
+    ]
+
+    # Use related queries from first trend item as content gap signal
+    rising_kws = trends[0].get("related", []) if trends else []
+    content_gap = rising_kws[0] if rising_kws else "no dominant angle yet"
+
+    source = "Apify" if os.getenv("APIFY_API_TOKEN", "").strip() else "mock"
 
     return {
         "overall_score": avg_score,
         "sub_topics": sub_topics,
         "competition_level": competition,
         "content_gap": content_gap,
-        "source": "Google Trends",
+        "source": source,
     }
-
-
-async def _haiku_trend_fallback(client: anthropic.AsyncAnthropic, topic: str) -> dict:
-    """Haiku estimation — only used when Google Trends is unavailable."""
-    msg = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=500,
-        messages=[{
-            "role": "user",
-            "content": (
-                f"HK social media trend analyst. Topic: \"{topic}\"\n"
-                "Return ONLY valid JSON:\n"
-                '{"overall_score":7.5,'
-                '"sub_topics":['
-                '{"name":"short name","score":85,"trend":"up"},'
-                '{"name":"short name","score":72,"trend":"stable"},'
-                '{"name":"short name","score":60,"trend":"down"}'
-                '],'
-                '"competition_level":"medium",'
-                '"content_gap":"5 words describing gap",'
-                '"source":"AI estimate"}'
-            ),
-        }],
-    )
-    return _parse_json(msg.content[0].text)
 
 
 async def _max_angle_analysis(client: anthropic.AsyncAnthropic, topic: str, scan: dict) -> list:
@@ -213,7 +150,7 @@ def _format_aria_message(topic: str, scan: dict) -> str:
     }.get(scan.get("competition_level", ""), "")
 
     source = scan.get("source", "Google Trends")
-    source_label = "📡 數據來源：Google Trends HK" if source == "Google Trends" else "⚠️ Google Trends 暫時唔可用，以下係 AI 估計"
+    source_label = "📡 數據來源：Apify Google Trends HK" if source == "Apify" else "⚠️ 冇 Apify token，以下係 mock 數據"
 
     return (
         f"📊 *市場快掃：{topic}*\n"
