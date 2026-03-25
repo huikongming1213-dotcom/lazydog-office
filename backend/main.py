@@ -480,3 +480,15 @@ async def _run_full_pipeline(job_id: str, topic: str, platforms: list, tone: str
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "lazydog-office"}
+
+
+@app.get("/debug/agent-tokens")
+async def debug_agent_tokens():
+    """Check if agent bot tokens are loaded (shows True/False only, never the actual token)."""
+    return {
+        "ARIA_BOT_TOKEN":  bool(os.getenv("ARIA_BOT_TOKEN", "").strip()),
+        "MAX_BOT_TOKEN":   bool(os.getenv("MAX_BOT_TOKEN", "").strip()),
+        "ZOE_BOT_TOKEN":   bool(os.getenv("ZOE_BOT_TOKEN", "").strip()),
+        "CHIEF_BOT_TOKEN": bool(os.getenv("CHIEF_BOT_TOKEN", "").strip()),
+        "TELEGRAM_BOT_TOKEN": bool(os.getenv("TELEGRAM_BOT_TOKEN", "").strip()),
+    }
