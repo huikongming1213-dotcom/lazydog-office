@@ -55,23 +55,20 @@ async def _aria_quick_scan(client: anthropic.AsyncAnthropic, topic: str) -> dict
     """
     msg = await client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=350,
+        max_tokens=500,
         messages=[{
             "role": "user",
             "content": (
-                f"You are a HK social media market analyst. "
-                f"For the topic \"{topic}\", provide realistic trend data for HK social media.\n\n"
-                "Return JSON only:\n"
-                "{\n"
-                '  "overall_score": <1-10 float>,\n'
-                '  "sub_topics": [\n'
-                '    {"name": "...", "score": <1-100 int>, "trend": "up/stable/down"},\n'
-                '    {"name": "...", "score": <1-100 int>, "trend": "up/stable/down"},\n'
-                '    {"name": "...", "score": <1-100 int>, "trend": "up/stable/down"}\n'
-                "  ],\n"
-                '  "competition_level": "low/medium/high",\n'
-                '  "content_gap": "one sentence: what existing content is missing"\n'
-                "}"
+                f"HK social media trend analyst. Topic: \"{topic}\"\n"
+                "Return ONLY valid JSON, no extra text:\n"
+                '{"overall_score":7.5,'
+                '"sub_topics":['
+                '{"name":"short name","score":85,"trend":"up"},'
+                '{"name":"short name","score":72,"trend":"stable"},'
+                '{"name":"short name","score":60,"trend":"down"}'
+                '],'
+                '"competition_level":"medium",'
+                '"content_gap":"5 words max describing gap"}'
             ),
         }],
     )
@@ -86,23 +83,18 @@ async def _max_angle_analysis(client: anthropic.AsyncAnthropic, topic: str, scan
     )
     msg = await client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=450,
+        max_tokens=700,
         messages=[{
             "role": "user",
             "content": (
-                f"You are a social media copywriter. Topic: \"{topic}\"\n\n"
-                f"Trend data:\n{sub_lines}\n"
-                f"Content gap: {scan.get('content_gap', '')}\n\n"
-                "Suggest 3 distinct content angles. Return JSON only:\n"
-                "[\n"
-                "  {\n"
-                '    "angle": "short angle name",\n'
-                '    "hook": "punchy opening line in Traditional Chinese",\n'
-                '    "format": "e.g. before/after, tutorial, opinion, story",\n'
-                '    "best_platform": "ig/linkedin/x",\n'
-                '    "strength": "why this angle works (one sentence)"\n'
-                "  }\n"
-                "]"
+                f"Social media copywriter. Topic: \"{topic}\"\n"
+                f"Trends: {sub_lines}\n"
+                f"Gap: {scan.get('content_gap', '')}\n\n"
+                "Return ONLY valid JSON array, no extra text:\n"
+                '[{"angle":"name","hook":"Traditional Chinese hook under 20 chars",'
+                '"format":"before/after or tutorial or story","best_platform":"ig",'
+                '"strength":"reason under 10 words"}]'
+                "\nProvide exactly 3 objects."
             ),
         }],
     )
@@ -111,22 +103,23 @@ async def _max_angle_analysis(client: anthropic.AsyncAnthropic, topic: str, scan
 
 async def _chief_rank(client: anthropic.AsyncAnthropic, topic: str, angles: list) -> dict:
     """Chief ranks angles by Lazydog.ai brand fit."""
+    angle_names = [a.get("angle", "") for a in angles]
+    angles_brief = "\n".join(
+        f'{i+1}. {a.get("angle","")} — {a.get("hook","")}'
+        for i, a in enumerate(angles)
+    )
     msg = await client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=300,
+        max_tokens=400,
         messages=[{
             "role": "user",
             "content": (
-                "You are the Content Director at Lazydog.ai — a witty, approachable AI productivity brand.\n"
-                "Brand values: empowering, smart-but-lazy, never corporate or tech-heavy.\n\n"
-                f"Topic: \"{topic}\"\n"
-                f"Angles proposed:\n{json.dumps(angles, ensure_ascii=False, indent=2)}\n\n"
-                "Pick the best angle for brand fit. Return JSON only:\n"
-                "{\n"
-                '  "best_angle": "<angle name>",\n'
-                '  "best_hook": "<the hook for that angle>",\n'
-                '  "brand_notes": "what to emphasise and what to avoid (one sentence)",\n'
-                '  "ranking": ["best angle name", "2nd", "3rd"]\n'
+                "Lazydog.ai Content Director. Brand: witty, empowering, never corporate.\n"
+                f"Topic: \"{topic}\"\nAngles:\n{angles_brief}\n\n"
+                "Return ONLY valid JSON, no extra text:\n"
+                '{"best_angle":"angle name","best_hook":"hook under 20 chars",'
+                '"brand_notes":"emphasise X avoid Y under 15 words",'
+                f'"ranking":{json.dumps(angle_names)}' + "}"
                 "}"
             ),
         }],
@@ -185,8 +178,20 @@ def _format_chief_message(rec: dict) -> str:
 
 def _parse_json(raw: str) -> dict | list:
     raw = raw.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
+    # Strip markdown code fences
+    if "```" in raw:
+        parts = raw.split("```")
+        # parts[1] is inside the fences
+        raw = parts[1] if len(parts) > 1 else raw
         if raw.startswith("json"):
             raw = raw[4:]
-    return json.loads(raw.strip())
+    raw = raw.strip()
+    # Find the first { or [ and last } or ] to extract just the JSON
+    start = min(
+        (raw.find(c) for c in ["{", "["] if raw.find(c) != -1),
+        default=0,
+    )
+    end = max(raw.rfind("}"), raw.rfind("]")) + 1
+    if end > start:
+        raw = raw[start:end]
+    return json.loads(raw)
