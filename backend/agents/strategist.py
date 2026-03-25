@@ -10,10 +10,12 @@ Flow:
 Each step posts to TG group as the agent's own bot.
 Full Apify call happens later in trend_analyst.py when /go is triggered.
 """
+import asyncio
 import json
 import logging
 import os
 import anthropic
+from functools import partial
 
 from backend.services.agent_messenger import send_as
 
@@ -49,10 +51,77 @@ async def run_strategy_discussion(topic: str):
 
 async def _aria_quick_scan(client: anthropic.AsyncAnthropic, topic: str) -> dict:
     """
-    Simulate HK market trend data via Claude Haiku.
-    No Apify call — this is brainstorm mode only.
-    Real Apify analysis happens during pipeline run.
+    Real Google Trends data via pytrends (free, no API key).
+    Falls back to Haiku estimation only if Google rate-limits.
     """
+    try:
+        trends_data = await asyncio.get_event_loop().run_in_executor(
+            None, partial(_fetch_google_trends, topic)
+        )
+        return trends_data
+    except Exception as e:
+        logger.warning(f"[Strategist] pytrends failed ({e}), falling back to Haiku estimate")
+        return await _haiku_trend_fallback(client, topic)
+
+
+def _fetch_google_trends(topic: str) -> dict:
+    """Synchronous Google Trends fetch — run in thread executor."""
+    from pytrends.request import TrendReq
+
+    pytrends = TrendReq(hl="zh-TW", tz=480, timeout=(10, 25))
+
+    # Overall interest for the main topic (HK, past 7 days)
+    pytrends.build_payload([topic], cat=0, timeframe="now 7-d", geo="HK")
+    interest_df = pytrends.interest_over_time()
+
+    if interest_df.empty:
+        raise ValueError("No Google Trends data returned")
+
+    scores = interest_df[topic].tolist()
+    avg_score = round(sum(scores) / len(scores) / 10, 1)  # normalise to 0-10
+    latest = scores[-1]
+    week_ago = scores[0]
+    overall_trend = "up" if latest > week_ago + 5 else "down" if latest < week_ago - 5 else "stable"
+
+    # Related queries for sub-topics
+    related = pytrends.related_queries()
+    top_related = related.get(topic, {}).get("top")
+
+    sub_topics = []
+    if top_related is not None and not top_related.empty:
+        for _, row in top_related.head(3).iterrows():
+            kw = row["query"]
+            val = int(row["value"])
+            # Quick per-keyword trend: compare first half vs second half of week
+            mid = len(scores) // 2
+            kw_trend = "up" if scores[-1] > scores[mid] else "stable"
+            sub_topics.append({"name": kw, "score": val, "trend": kw_trend})
+
+    # Fill up to 3 if fewer related queries
+    while len(sub_topics) < 3:
+        sub_topics.append({"name": topic, "score": max(1, latest - 10 * len(sub_topics)), "trend": overall_trend})
+
+    competition = "high" if avg_score >= 7 else "medium" if avg_score >= 4 else "low"
+
+    # Rising queries as content gap signal
+    rising = related.get(topic, {}).get("rising")
+    if rising is not None and not rising.empty:
+        gap_kw = rising.iloc[0]["query"]
+        content_gap = f"rising: {gap_kw}"
+    else:
+        content_gap = "no dominant local content"
+
+    return {
+        "overall_score": avg_score,
+        "sub_topics": sub_topics,
+        "competition_level": competition,
+        "content_gap": content_gap,
+        "source": "Google Trends",
+    }
+
+
+async def _haiku_trend_fallback(client: anthropic.AsyncAnthropic, topic: str) -> dict:
+    """Haiku estimation — only used when Google Trends is unavailable."""
     msg = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=500,
@@ -60,7 +129,7 @@ async def _aria_quick_scan(client: anthropic.AsyncAnthropic, topic: str) -> dict
             "role": "user",
             "content": (
                 f"HK social media trend analyst. Topic: \"{topic}\"\n"
-                "Return ONLY valid JSON, no extra text:\n"
+                "Return ONLY valid JSON:\n"
                 '{"overall_score":7.5,'
                 '"sub_topics":['
                 '{"name":"short name","score":85,"trend":"up"},'
@@ -68,7 +137,8 @@ async def _aria_quick_scan(client: anthropic.AsyncAnthropic, topic: str) -> dict
                 '{"name":"short name","score":60,"trend":"down"}'
                 '],'
                 '"competition_level":"medium",'
-                '"content_gap":"5 words max describing gap"}'
+                '"content_gap":"5 words describing gap",'
+                '"source":"AI estimate"}'
             ),
         }],
     )
@@ -142,12 +212,16 @@ def _format_aria_message(topic: str, scan: dict) -> str:
         "high": "🔴 競爭激烈，要差異化",
     }.get(scan.get("competition_level", ""), "")
 
+    source = scan.get("source", "Google Trends")
+    source_label = "📡 數據來源：Google Trends HK" if source == "Google Trends" else "⚠️ Google Trends 暫時唔可用，以下係 AI 估計"
+
     return (
         f"📊 *市場快掃：{topic}*\n"
+        f"{source_label}\n\n"
         f"整體熱度：{scan.get('overall_score', '?')}/10\n\n"
-        f"*Sub-topics：*\n{sub_lines}\n\n"
+        f"*相關搜尋趨勢：*\n{sub_lines}\n\n"
         f"{competition}\n"
-        f"💡 內容空白：_{scan.get('content_gap', '')}_"
+        f"💡 上升趨勢：_{scan.get('content_gap', '')}_"
     )
 
 
